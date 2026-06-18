@@ -783,7 +783,7 @@ run(function()
 	local panelW = 240
 
 	local function findBountyData()
-		for _, v in workspace:GetDescendants() do
+		for _, v in game:GetDescendants() do
 			if v:IsA('StringValue') and v.Name == 'BountyData' then
 				return v
 			end
