@@ -774,13 +774,12 @@ end)
 run(function()
 	local BountyTracker
 	local MinBounty
-	local panel
 	local listFrame
-	local rowHeight = 32
-	local rowPadding = 4
-	local panelWidth = 260
-	local avatarSize = 24
+	local emptyLabel
 	local entryPool = {}
+	local rowHeight = 28
+	local rowPadding = 3
+	local panelW = 240
 
 	local function findBountyData()
 		for _, v in workspace:GetDescendants() do
@@ -792,121 +791,109 @@ run(function()
 
 	local function formatBounty(num)
 		local s = tostring(math.floor(num))
-		local result = s:reverse():gsub('(%d%d%d)', '%1,'):reverse()
-		if result:sub(1, 1) == ',' then result = result:sub(2) end
-		return '$' .. result
+		local r = s:reverse():gsub('(%d%d%d)', '%1,'):reverse()
+		if r:sub(1,1) == ',' then r = r:sub(2) end
+		return '$' .. r
 	end
 
-	local function getBounties(minBounty)
-		local bountyValue = findBountyData()
-		if not bountyValue then return nil end
-		local suc, data = pcall(function() return httpService:JSONDecode(bountyValue.Value) end)
-		if not suc or type(data) ~= 'table' then return nil end
-		local filtered = {}
-		for _, entry in ipairs(data) do
-			if (entry.Bounty or 0) > minBounty then
-				table.insert(filtered, entry)
+	local function getBounties()
+		local val = findBountyData()
+		if not val then return {} end
+		local suc, data = pcall(function() return httpService:JSONDecode(val.Value) end)
+		if not suc or type(data) ~= 'table' then return {} end
+		local out = {}
+		for _, e in ipairs(data) do
+			if (e.Bounty or 0) > (MinBounty and MinBounty.Value or 2000) then
+				table.insert(out, e)
 			end
 		end
-		table.sort(filtered, function(a, b) return (a.Bounty or 0) > (b.Bounty or 0) end)
-		return filtered
+		table.sort(out, function(a, b) return (a.Bounty or 0) > (b.Bounty or 0) end)
+		return out
 	end
 
-	local function renderBounties(entries)
-		if not panel then return end
-		for _, row in entryPool do
-			row.Visible = false
-		end
-		if not entries or #entries == 0 then
-			if not panel:FindFirstChild('EmptyLabel') then
-				local lbl = Instance.new('TextLabel')
-				lbl.Name = 'EmptyLabel'
-				lbl.Size = UDim2.new(1, -16, 0, rowHeight)
-				lbl.Position = UDim2.fromOffset(8, 8)
-				lbl.BackgroundTransparency = 1
-				lbl.TextColor3 = Color3.fromRGB(160, 160, 160)
-				lbl.Font = Enum.Font.GothamMedium
-				lbl.TextSize = 13
-				lbl.TextXAlignment = Enum.TextXAlignment.Left
-				lbl.Parent = panel
-			end
-			panel.EmptyLabel.Text = 'No bounties over ' .. formatBounty(MinBounty and MinBounty.Value or 2000)
-			panel.EmptyLabel.Visible = true
-			listFrame.Visible = false
-			panel.Size = UDim2.fromOffset(panelWidth, rowHeight + 16)
+	local function setHeight(n)
+		local h = n > 0 and (n * rowHeight + (n - 1) * rowPadding) or rowHeight
+		listFrame.Size = UDim2.fromOffset(panelW, h)
+		BountyTracker.Children.Size = UDim2.fromOffset(panelW, h)
+	end
+
+	local function renderBounties()
+		if not listFrame then return end
+		for _, row in entryPool do row.Visible = false end
+		local entries = getBounties()
+		if #entries == 0 then
+			emptyLabel.Text = 'No bounties over ' .. formatBounty(MinBounty and MinBounty.Value or 2000)
+			emptyLabel.Visible = true
+			setHeight(0)
 			return
 		end
-		if panel:FindFirstChild('EmptyLabel') then
-			panel.EmptyLabel.Visible = false
-		end
-		listFrame.Visible = true
+		emptyLabel.Visible = false
 		for i, entry in ipairs(entries) do
 			local row = entryPool[i]
 			if not row then
 				row = Instance.new('Frame')
-				row.Name = 'Row' .. i
 				row.BackgroundTransparency = 1
 				row.Size = UDim2.new(1, 0, 0, rowHeight)
 				row.LayoutOrder = i
 
-				local avatar = Instance.new('ImageLabel')
-				avatar.Name = 'Avatar'
-				avatar.Size = UDim2.fromOffset(avatarSize, avatarSize)
-				avatar.Position = UDim2.fromOffset(0, (rowHeight - avatarSize) / 2)
-				avatar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-				avatar.BackgroundTransparency = 0.4
-				avatar.Image = ''
-				Instance.new('UICorner', avatar).CornerRadius = UDim.new(0, 4)
-				avatar.Parent = row
+				local sep = Instance.new('Frame', row)
+				sep.Size = UDim2.new(1, 0, 0, 1)
+				sep.Position = UDim2.new(0, 0, 1, -1)
+				sep.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				sep.BackgroundTransparency = 0.92
+				sep.BorderSizePixel = 0
 
-				local nameLabel = Instance.new('TextLabel')
-				nameLabel.Name = 'NameLabel'
-				nameLabel.Size = UDim2.new(1, -(avatarSize + 10), 1, 0)
-				nameLabel.Position = UDim2.fromOffset(avatarSize + 8, 0)
-				nameLabel.BackgroundTransparency = 1
-				nameLabel.TextColor3 = Color3.new(1, 1, 1)
-				nameLabel.Font = Enum.Font.GothamMedium
-				nameLabel.TextSize = 13
-				nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-				nameLabel.TextStrokeColor3 = Color3.new()
-				nameLabel.TextStrokeTransparency = 0.7
-				nameLabel.Parent = row
+				local av = Instance.new('ImageLabel', row)
+				av.Name = 'Avatar'
+				av.Size = UDim2.fromOffset(20, 20)
+				av.Position = UDim2.fromOffset(0, (rowHeight - 20) / 2)
+				av.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+				av.BackgroundTransparency = 0.2
+				av.Image = ''
+				av.ScaleType = Enum.ScaleType.Crop
+				Instance.new('UICorner', av).CornerRadius = UDim.new(0, 3)
+
+				local lbl = Instance.new('TextLabel', row)
+				lbl.Name = 'Lbl'
+				lbl.Size = UDim2.new(1, -28, 1, 0)
+				lbl.Position = UDim2.fromOffset(26, 0)
+				lbl.BackgroundTransparency = 1
+				lbl.TextColor3 = Color3.new(1, 1, 1)
+				lbl.Font = Enum.Font.Gotham
+				lbl.TextSize = 12
+				lbl.TextXAlignment = Enum.TextXAlignment.Left
+				lbl.TextStrokeColor3 = Color3.new()
+				lbl.TextStrokeTransparency = 0.8
 
 				row.Parent = listFrame
 				entryPool[i] = row
 			end
 			row.Visible = true
 			row.LayoutOrder = i
-			row.NameLabel.Text = (entry.Name or '???') .. '  -  ' .. formatBounty(entry.Bounty or 0)
-			local userId = entry.UserId
-			if userId then
+			row.Lbl.Text = (entry.Name or '?') .. ' - ' .. formatBounty(entry.Bounty or 0)
+			local uid = entry.UserId
+			if uid then
 				task.spawn(function()
-					local suc, url = pcall(function()
-						return playersService:GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
-					end)
-					if suc and url and row and row.Avatar then
-						row.Avatar.Image = url
-					end
+					local ok, url = pcall(playersService.GetUserThumbnailAsync, playersService, uid, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+					if ok and url and row.Avatar then row.Avatar.Image = url end
 				end)
 			end
 		end
-		local listHeight = #entries * rowHeight + (#entries - 1) * rowPadding
-		listFrame.Size = UDim2.new(1, -16, 0, listHeight)
-		panel.Size = UDim2.fromOffset(panelWidth, listHeight + 16)
+		setHeight(#entries)
 	end
 
-	BountyTracker = vape.Categories.Render:CreateModule({
-		Name = 'BountyTracker',
+	BountyTracker = vape:CreateOverlay({
+		Name = 'Bounty Tracker',
+		Size = UDim2.fromOffset(panelW, rowHeight),
+		Position = UDim2.fromOffset(12, 12),
 		Function = function(callback)
 			if callback then
 				repeat
-					renderBounties(getBounties(MinBounty and MinBounty.Value or 2000))
+					renderBounties()
 					task.wait(5)
-				until not BountyTracker.Enabled
+				until not BountyTracker.Button or not BountyTracker.Button.Enabled
 				for _, row in entryPool do row.Visible = false end
-				if panel and panel:FindFirstChild('EmptyLabel') then
-					panel.EmptyLabel.Visible = false
-				end
+				emptyLabel.Visible = false
 			end
 		end,
 		Tooltip = 'Shows wanted players above a bounty threshold'
@@ -917,55 +904,59 @@ run(function()
 		Min = 0,
 		Max = 100000,
 		Default = 2000,
-		Suffix = function(val)
-			return '  (' .. formatBounty(val) .. ')'
-		end
+		Suffix = function(val) return '  (' .. formatBounty(val) .. ')' end
 	})
 
-	panel = Instance.new('Frame')
-	panel.Name = 'BountyPanel'
-	panel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-	panel.BackgroundTransparency = 0.2
-	panel.BorderSizePixel = 0
-	panel.Size = UDim2.fromOffset(panelWidth, 50)
-	panel.ClipsDescendants = true
-	panel.Parent = BountyTracker.Children
-	Instance.new('UICorner', panel).CornerRadius = UDim.new(0, 6)
-	local panelStroke = Instance.new('UIStroke', panel)
-	panelStroke.Color = Color3.fromRGB(60, 60, 60)
-	panelStroke.Transparency = 0.5
+	local container = BountyTracker.Children
+	container.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+	container.BackgroundTransparency = 0.15
+	container.ClipsDescendants = true
+	Instance.new('UICorner', container).CornerRadius = UDim.new(0, 6)
+	local stroke = Instance.new('UIStroke', container)
+	stroke.Color = Color3.fromRGB(255, 255, 255)
+	stroke.Transparency = 0.88
+	stroke.Thickness = 1
 
-	local titleBar = Instance.new('Frame', panel)
-	titleBar.Size = UDim2.new(1, 0, 0, 22)
-	titleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-	titleBar.BackgroundTransparency = 0.1
-	titleBar.BorderSizePixel = 0
-	Instance.new('UICorner', titleBar).CornerRadius = UDim.new(0, 6)
-	local titleCover = Instance.new('Frame', titleBar)
-	titleCover.Size = UDim2.new(1, 0, 0, 6)
-	titleCover.Position = UDim2.new(0, 0, 1, -6)
-	titleCover.BackgroundColor3 = titleBar.BackgroundColor3
-	titleCover.BackgroundTransparency = titleBar.BackgroundTransparency
-	titleCover.BorderSizePixel = 0
-	local titleLabel = Instance.new('TextLabel', titleBar)
-	titleLabel.Size = UDim2.new(1, -8, 1, 0)
-	titleLabel.Position = UDim2.fromOffset(8, 0)
-	titleLabel.BackgroundTransparency = 1
-	titleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-	titleLabel.Font = Enum.Font.GothamBold
-	titleLabel.TextSize = 12
-	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-	titleLabel.Text = 'Bounty Tracker'
+	local header = Instance.new('Frame', container)
+	header.Size = UDim2.new(1, 0, 0, 20)
+	header.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+	header.BackgroundTransparency = 0.15
+	header.BorderSizePixel = 0
+	Instance.new('UICorner', header).CornerRadius = UDim.new(0, 6)
+	local headerCover = Instance.new('Frame', header)
+	headerCover.Size = UDim2.new(1, 0, 0.5, 0)
+	headerCover.Position = UDim2.fromScale(0, 0.5)
+	headerCover.BackgroundColor3 = header.BackgroundColor3
+	headerCover.BackgroundTransparency = header.BackgroundTransparency
+	headerCover.BorderSizePixel = 0
+	local headerLbl = Instance.new('TextLabel', header)
+	headerLbl.Size = UDim2.new(1, -8, 1, 0)
+	headerLbl.Position = UDim2.fromOffset(8, 0)
+	headerLbl.BackgroundTransparency = 1
+	headerLbl.TextColor3 = Color3.new(1, 1, 1)
+	headerLbl.Font = Enum.Font.GothamBold
+	headerLbl.TextSize = 11
+	headerLbl.TextXAlignment = Enum.TextXAlignment.Left
+	headerLbl.Text = 'BOUNTY TRACKER'
 
-	listFrame = Instance.new('Frame', panel)
+	listFrame = Instance.new('Frame', container)
 	listFrame.Name = 'List'
-	listFrame.Position = UDim2.fromOffset(8, 26)
+	listFrame.Position = UDim2.fromOffset(8, 24)
+	listFrame.Size = UDim2.fromOffset(panelW - 16, rowHeight)
 	listFrame.BackgroundTransparency = 1
-	listFrame.Size = UDim2.new(1, -16, 0, 0)
-	listFrame.ClipsDescendants = false
-	local listLayout = Instance.new('UIListLayout', listFrame)
-	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	listLayout.Padding = UDim.new(0, rowPadding)
+	local layout = Instance.new('UIListLayout', listFrame)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Padding = UDim.new(0, rowPadding)
+
+	emptyLabel = Instance.new('TextLabel', listFrame)
+	emptyLabel.Size = UDim2.new(1, 0, 0, rowHeight)
+	emptyLabel.BackgroundTransparency = 1
+	emptyLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
+	emptyLabel.Font = Enum.Font.Gotham
+	emptyLabel.TextSize = 11
+	emptyLabel.TextXAlignment = Enum.TextXAlignment.Left
+	emptyLabel.Text = 'No bounties over $2,000'
+	emptyLabel.Visible = false
+	emptyLabel.LayoutOrder = 0
 end)
-	
 	
